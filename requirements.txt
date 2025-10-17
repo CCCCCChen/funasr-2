@@ -5,3 +5,5 @@ soundfile
 numpy
 funasr
 torch
+pydantic
+concurrent-log-handler
