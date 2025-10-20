@@ -16,7 +16,9 @@ asr_pipeline = FunASRPipeline(
     asr_model_dir="models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
     punc_model_dir="models/punc_ct-transformer_cn-en-common-vocab471067-large",
     spk_model_dir="models/speech_campplus_sv_zh-cn_16k-common",
-    device="cpu"  # 改为 "cpu" 亦可
+    device="cpu",  # 改为 "cpu" 亦可
+    use_external_punc=False,
+    use_diarization=False
 )
 
 @app.post("/asr/submit")
@@ -38,18 +40,29 @@ async def submit_asr(file: UploadFile = File(...)):
 
 @app.get("/asr/status/{task_id}")
 def check_status(task_id: str):
-    """查询任务状态"""
+    """查询任务状态：返回正在进行的进度与信息，完成时返回结果，错误时返回错误详情"""
     task = task_manager.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if task["status"] == "done":
+    status = task.get("status")
+    if status == "done":
         return {
             "status": "done",
-            "result": task["result"]
+            "result": task.get("result")
+        }
+    elif status == "error":
+        return {
+            "status": "error",
+            "error": task.get("error"),
+            "message": task.get("message")
         }
     else:
-        return {"status": task["status"]}
+        return {
+            "status": status,
+            "progress": task.get("progress"),
+            "message": task.get("message")
+        }
 
 @app.get("/health")
 def health():
