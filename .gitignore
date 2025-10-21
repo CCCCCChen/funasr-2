@@ -1,0 +1,10 @@
+# Ignore model artifacts
+models/
+
+# Ignore Python cache
+__pycache__/
+**/__pycache__/
+
+# Optional: compiled Python files
+*.pyc
+*.pyo
