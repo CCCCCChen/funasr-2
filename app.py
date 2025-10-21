@@ -4,19 +4,31 @@ from my_funasr.funasr_pipeline import FunASRPipeline
 from task_manager import TaskManager
 import uuid, asyncio
 
+from modelscope import snapshot_download
+from pathlib import Path
+import torch
+
+# 下载/定位模型到项目 models 目录
+BASE_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BASE_DIR / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+model_dir = snapshot_download(
+    'iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch',
+    cache_dir=str(MODELS_DIR)
+)
+
 app = FastAPI(title="FunASR Async Service", description="ASR with punctuation & diarization", version="2.0")
 
 # 初始化任务管理器与模型管线
 task_manager = TaskManager()
+
+# 自动选择设备：若CUDA不可用则使用CPU，避免 Torch not compiled with CUDA enabled
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 asr_pipeline = FunASRPipeline(
-    # asr_model_dir="models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-    # punc_model_dir="models/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
-    # spk_model_dir="models/speech_campplus_speaker-diarization-pytorch",
-    # device="cuda:0"  # 改为 "cpu" 亦可
-    asr_model_dir="models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-    punc_model_dir="models/punc_ct-transformer_cn-en-common-vocab471067-large",
-    spk_model_dir="models/speech_campplus_sv_zh-cn_16k-common",
-    device="cpu",  # 改为 "cpu" 亦可
+    asr_model_dir=model_dir,  # 使用本地已下载模型路径
+    punc_model_dir="iic/punc_ct-transformer_cn-en-common-vocab471067-large",
+    spk_model_dir="iic/speech_campplus_sv_zh-cn_16k-common",
+    device=device,
     use_external_punc=False,
     use_diarization=False
 )

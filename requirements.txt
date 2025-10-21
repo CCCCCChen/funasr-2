@@ -7,3 +7,5 @@ funasr
 torch
 pydantic
 concurrent-log-handler
+modelscope
+python-multipart
