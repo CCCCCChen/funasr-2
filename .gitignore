@@ -1,0 +1,5 @@
+# Ignore model artifacts
+/models/
+
+# Ignore Python bytecode caches
+__pycache__/

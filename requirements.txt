@@ -4,6 +4,7 @@ librosa
 soundfile
 numpy
 funasr
+modelscope
 torch
 pydantic
 concurrent-log-handler
