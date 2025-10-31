@@ -4,8 +4,10 @@ class TaskManager:
     def __init__(self):
         self.tasks = {}
         self.lock = threading.Lock()
+        # 维护文件哈希到最新任务ID的索引，便于按哈希查询
+        self.hash_index = {}
 
-    def create_task(self, task_id, status="pending"):
+    def create_task(self, task_id, status="pending", file_hash=None):
         with self.lock:
             self.tasks[task_id] = {
                 "status": status,
@@ -13,7 +15,10 @@ class TaskManager:
                 "progress": 0.0,
                 "error": None,
                 "message": None,
+                "file_hash": file_hash,
             }
+            if file_hash:
+                self.hash_index[file_hash] = task_id
 
     def update_task(self, task_id, status=None, result=None, progress=None, error=None, message=None):
         with self.lock:
@@ -38,3 +43,10 @@ class TaskManager:
     def get_task(self, task_id):
         with self.lock:
             return self.tasks.get(task_id)
+
+    def get_task_by_hash(self, file_hash: str):
+        with self.lock:
+            tid = self.hash_index.get(file_hash)
+            if not tid:
+                return None
+            return self.tasks.get(tid)

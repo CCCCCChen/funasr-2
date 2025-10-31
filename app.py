@@ -7,6 +7,8 @@ import uuid, asyncio
 from modelscope import snapshot_download
 from pathlib import Path
 import torch
+import shutil
+import hashlib
 
 # 下载/定位模型到项目 models 目录
 BASE_DIR = Path(__file__).resolve().parent
@@ -35,20 +37,36 @@ asr_pipeline = FunASRPipeline(
 
 @app.post("/asr/submit")
 async def submit_asr(file: UploadFile = File(...)):
-    """接收音频文件并启动异步识别任务"""
-    if file.content_type not in ["audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3"]:
-        raise HTTPException(status_code=400, detail="Unsupported audio format")
+    """接收音频文件并启动异步识别任务（支持大文件与 m4a），按块落盘并计算哈希"""
+    # 落盘到 uploads 目录，并计算 sha256 哈希
+    uploads_dir = BASE_DIR / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    orig_name = file.filename or "upload"
+    suffix = Path(orig_name).suffix or ""
+    temp_path = uploads_dir / f"{uuid.uuid4()}{suffix}"
 
-    audio_bytes = await file.read()
+    hasher = hashlib.sha256()
+    try:
+        with temp_path.open("wb") as f:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                hasher.update(chunk)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to persist uploaded file")
+    file_hash = hasher.hexdigest()
+
     task_id = str(uuid.uuid4())
 
-    # 注册任务
-    task_manager.create_task(task_id, status="pending")
+    # 注册任务（记录文件哈希）
+    task_manager.create_task(task_id, status="pending", file_hash=file_hash)
 
-    # 启动后台任务
-    asyncio.create_task(asr_pipeline.run_task(task_id, audio_bytes, task_manager))
+    # 启动后台任务：传递文件路径以便后端解码
+    asyncio.create_task(asr_pipeline.run_task(task_id, str(temp_path), task_manager))
 
-    return {"task_id": task_id, "status": "processing"}
+    return {"task_id": task_id, "file_hash": file_hash, "status": "processing"}
 
 @app.get("/asr/status/{task_id}")
 def check_status(task_id: str):
@@ -79,3 +97,17 @@ def check_status(task_id: str):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/asr/status_by_hash/{file_hash}")
+def check_status_by_hash(file_hash: str):
+    """按文件哈希查询最新任务状态"""
+    task = task_manager.get_task_by_hash(file_hash)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found for given hash")
+    status = task.get("status")
+    if status == "done":
+        return {"status": "done", "result": task.get("result")}
+    elif status == "error":
+        return {"status": "error", "error": task.get("error"), "message": task.get("message")}
+    else:
+        return {"status": status, "progress": task.get("progress"), "message": task.get("message")}

@@ -69,12 +69,12 @@ class FunASRPipeline:
             self.spk_model = None
         print("✅ Models loaded.")
 
-    def _run_task_sync(self, task_id, audio_bytes, task_manager):
+    def _run_task_sync(self, task_id, audio_input, task_manager):
         try:
             task_manager.update_task(task_id, status="running", progress=0.05, message="loading audio")
 
-            # 加载音频
-            audio, sr, duration = load_audio(audio_bytes)
+            # 加载音频（支持文件路径或二进制）
+            audio, sr, duration = load_audio(audio_input)
             task_manager.update_task(task_id, progress=0.10, message=f"audio loaded: sr={sr}, dur={duration:.2f}s")
 
             # 说话人分离（仅在具备真实分离模型时启用）
@@ -152,5 +152,5 @@ class FunASRPipeline:
         except Exception as e:
             task_manager.update_task(task_id, status="error", error=str(e), message="pipeline error")
 
-    async def run_task(self, task_id, audio_bytes, task_manager):
-        await asyncio.to_thread(self._run_task_sync, task_id, audio_bytes, task_manager)
+    async def run_task(self, task_id, audio_input, task_manager):
+        await asyncio.to_thread(self._run_task_sync, task_id, audio_input, task_manager)
