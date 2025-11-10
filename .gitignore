@@ -4,6 +4,10 @@ models/
 # Ignore Python cache
 __pycache__/
 **/__pycache__/
+my_funasr/__pycache__/
+
+# Ignore uploaded files
+uploads/
 
 # Optional: compiled Python files
 *.pyc
